@@ -64,26 +64,35 @@ class MapReduce {
   int RunScript();
 
  private:
+  struct ReduceTempFiles {
+    std::vector<std::string> input_files;
+    std::vector<std::string> output_files;
+  };
+
+  /// Removes all the temporary files, which names are stored in the internal
+  /// temp_files_ vector.
   void RemoveTemporaryFiles();
 
-  /// Runs Map script, which uses internal class fields as script, source and
-  /// destination files paths.
+  /// Runs Map script, which uses passed strings as source and destination
+  /// files paths.
   /// \returns Script return value.
-  int RunMapScript();
+  /// \remark Map script uses stdin as the source and stdout as the
+  /// destination. Input and output are redirected manually.
+  int RunMapScript(const std::string& src_file, const std::string& dst_file);
 
   /// Runs Reduce script, which uses the passed file as the source and
-  /// destination file, internal script field as the script file path.
+  /// destination file.
   /// Passed file must be created by the ShuffleAndSort function before.
   /// \returns Script return value.
-  /// \remark The function assumes that Reduce script is able to read and
-  /// write to the same file.
-  int RunReduceScript(const std::string& file);
+  /// \remark Reduce script uses stdin as the source and stdout as the
+  /// destination. Input and output are redirected manually.
+  int RunReduceScript(const std::string& src_file, const std::string& dst_file);
 
   /// Loads all the data from the source file to the memory, sorts it,
   /// divides it on clusters according to the keys, writes these
   /// clusters to the created temporary files.
-  /// \returns Vector of created temporary files names.
-  std::vector<std::string> ShuffleAndSort();
+  /// \returns Struct of two vectors (of created temporary files names).
+  ReduceTempFiles ShuffleAndSort();
 
  private:
   Operation operation_;

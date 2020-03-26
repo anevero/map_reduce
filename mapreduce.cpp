@@ -59,13 +59,15 @@ void MapReduce::SetDestinationFile(const std::string& dst_file) {
 
 int MapReduce::RunScript() {
   if (operation_ == Operation::MAP) {
-    return RunMapScript();
+    return RunMapScript(src_file_, dst_file_);
   }
 
   int return_code = 0;
   auto files = ShuffleAndSort();
-  for (auto&& file : files) {
-    return_code = RunReduceScript(file);
+
+  int number_of_files = files.input_files.size();
+  for (int i = 0; i < number_of_files; ++i) {
+    return_code = RunReduceScript(files.input_files[i], files.output_files[i]);
     if (return_code != 0) {
       break;
     }
@@ -77,8 +79,8 @@ int MapReduce::RunScript() {
   }
 
   std::ofstream out(dst_file_, std::ios::binary);
-  for (auto&& file : files) {
-    std::ifstream in(file, std::ios::binary);
+  for (auto&& file : files.output_files) {
+    std::ifstream in(file);
     std::string current_line;
     while (std::getline(in, current_line, LINES_DELIMITER)) {
       out << current_line << LINES_DELIMITER;
@@ -97,15 +99,17 @@ void MapReduce::RemoveTemporaryFiles() {
   }
 }
 
-int MapReduce::RunMapScript() {
-  return bp::system(script_, src_file_, dst_file_);
+int MapReduce::RunMapScript(const std::string& src_file,
+                            const std::string& dst_file) {
+  return bp::system(script_, bp::std_in < src_file, bp::std_out > dst_file);
 }
 
-int MapReduce::RunReduceScript(const std::string& file) {
-  return bp::system(script_, file, file);
+int MapReduce::RunReduceScript(const std::string& src_file,
+                               const std::string& dst_file) {
+  return bp::system(script_, bp::std_in < src_file, bp::std_out > dst_file);
 }
 
-std::vector<std::string> MapReduce::ShuffleAndSort() {
+MapReduce::ReduceTempFiles MapReduce::ShuffleAndSort() {
   std::map<std::string, std::vector<int>> pairs;
   std::ifstream in(src_file_, std::ios::binary);
 
@@ -120,27 +124,32 @@ std::vector<std::string> MapReduce::ShuffleAndSort() {
   in.close();
 
   int number_of_keys = pairs.size();
-  std::vector<std::string> files;
-  files.reserve(number_of_keys);
+  std::vector<std::string> input_files;
+  std::vector<std::string> output_files;
+  input_files.reserve(number_of_keys);
+  output_files.reserve(number_of_keys);
+  temp_files_.reserve(temp_files_.size() + 2 * number_of_keys);
 
   std::string time = std::to_string(
       std::chrono::duration(
           std::chrono::system_clock::now().time_since_epoch()).count());
-  std::string temp_file_prefix = ".tmp.reduce." + time + ".";
+  std::string temp_file_prefix = ".tmp." + time + ".";
 
   for (int i = 0; i < number_of_keys; ++i) {
-    files.push_back(temp_file_prefix + std::to_string(i));
-    temp_files_.push_back(files.back());
+    input_files.emplace_back(temp_file_prefix + "in." + std::to_string(i));
+    output_files.emplace_back(temp_file_prefix + "out." + std::to_string(i));
+    temp_files_.push_back(input_files.back());
+    temp_files_.push_back(output_files.back());
   }
 
   int i = 0;
   for (auto&&[key, values] : pairs) {
-    std::ofstream out(files[i], std::ios::binary);
+    std::ofstream out(input_files[i], std::ios::binary);
     for (auto&& value : values) {
       out << key << KEY_VALUE_DELIMITER << value << LINES_DELIMITER;
     }
     ++i;
   }
 
-  return files;
+  return {input_files, output_files};
 }
