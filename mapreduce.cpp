@@ -78,7 +78,7 @@ int MapReduce::RunScript() {
     return return_code;
   }
 
-  std::ofstream out(dst_file_, std::ios::binary);
+  std::ofstream out(dst_file_);
   for (auto&& file : files.output_files) {
     std::ifstream in(file);
     std::string current_line;
@@ -111,7 +111,7 @@ int MapReduce::RunReduceScript(const std::string& src_file,
 
 MapReduce::ReduceTempFiles MapReduce::ShuffleAndSort() {
   std::map<std::string, std::vector<int>> pairs;
-  std::ifstream in(src_file_, std::ios::binary);
+  std::ifstream in(src_file_);
 
   std::string current_line;
   while (std::getline(in, current_line, LINES_DELIMITER)) {
@@ -144,7 +144,7 @@ MapReduce::ReduceTempFiles MapReduce::ShuffleAndSort() {
 
   int i = 0;
   for (auto&&[key, values] : pairs) {
-    std::ofstream out(input_files[i], std::ios::binary);
+    std::ofstream out(input_files[i]);
     for (auto&& value : values) {
       out << key << KEY_VALUE_DELIMITER << value << LINES_DELIMITER;
     }
