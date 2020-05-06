@@ -39,7 +39,11 @@ int MapReduce::RunScript() {
     return RunMapScript(src_file_, dst_file_);
   }
 
-  auto files = CombinePairs();
+  // Creating a temporary file for sorted pairs data.
+  temp_files_.push_back(bf::unique_path().native());
+  SortPairs(src_file_, temp_files_.back());
+
+  auto files = SplitPairs(temp_files_.back());
   int return_code = RunReduceScript(files);
 
   if (return_code != 0) {
@@ -47,12 +51,9 @@ int MapReduce::RunScript() {
     return return_code;
   }
 
-  // Creating a temporary file for unsorted pairs data.
-  temp_files_.push_back(bf::unique_path().native());
-  MergePairs(files.output_files, temp_files_.back());
-  SortPairs(temp_files_.back(), dst_file_);
-
+  MergePairs(files.output_files, dst_file_);
   RemoveTemporaryFiles();
+
   return return_code;
 }
 
@@ -102,9 +103,10 @@ int MapReduce::RunReduceScript(const ReduceTempFiles& files) const {
   return (return_code == 0) ? 0 : 1;
 }
 
-MapReduce::ReduceTempFiles MapReduce::CombinePairs() {
-  std::unordered_map<std::string, std::vector<std::string>> pairs;
-  std::ifstream in(src_file_);
+// Splitting sorted external data will be later implemented / called here.
+MapReduce::ReduceTempFiles MapReduce::SplitPairs(const std::string& src_file) {
+  std::vector<std::pair<std::string, std::vector<std::string>>> pairs;
+  std::ifstream in(src_file);
 
   std::string current_line;
   while (std::getline(in, current_line, kLinesDelimiter)) {
@@ -113,7 +115,12 @@ MapReduce::ReduceTempFiles MapReduce::CombinePairs() {
     std::string value;  // always equal to "1" in our task
     std::getline(line_stream, key, kKeyValueDelimiter);
     std::getline(line_stream, value, kLinesDelimiter);
-    pairs[std::move(key)].push_back(std::move(value));
+
+    if (!pairs.empty() && pairs.back().first == key) {
+      pairs.back().second.push_back(value);
+    } else {
+      pairs.emplace_back(key, std::vector{value});
+    }
   }
   in.close();
 
@@ -136,7 +143,7 @@ MapReduce::ReduceTempFiles MapReduce::CreateTempFiles(int number_of_files) {
   std::vector<std::string> output_files;
   input_files.reserve(number_of_files);
   output_files.reserve(number_of_files);
-  temp_files_.reserve(temp_files_.size() + 2 * number_of_files + 1);
+  temp_files_.reserve(temp_files_.size() + 2 * number_of_files);
 
   for (int i = 0; i < number_of_files; ++i) {
     input_files.push_back(bf::unique_path().native());

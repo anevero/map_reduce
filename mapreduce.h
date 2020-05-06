@@ -5,7 +5,6 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -100,7 +99,7 @@ class MapReduce {
   /// divides it on clusters according to the keys, writes these
   /// clusters to the created temporary files.
   /// \returns Struct of two vectors (of created temporary files names).
-  ReduceTempFiles CombinePairs();
+  ReduceTempFiles SplitPairs(const std::string& src_file);
 
   /// A helper function for the OrderPairs function. Creates the necessary
   /// number of temporary files.
