@@ -74,7 +74,7 @@ Map и входного файла Reduce, как вы можете замети
 Убедитесь также, что у вас установлены компоненты библиотеки Boost. Установить
 их можно, например, с использованием вашего пакетного менеджера:
 
-`sudo apt install libboost-dev`
+`sudo apt install libboost-dev libboost-filesystem-dev`
 
 # Инструкции по запуску
 

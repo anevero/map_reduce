@@ -3,9 +3,6 @@
 
 #include "mapreduce.h"
 
-const char KEY_VALUE_DELIMITER = '\t';
-const char LINES_DELIMITER = '\n';
-
 int main(int argc, char* argv[]) {
   if (argc < 5) {
     std::cerr << "Not enough arguments for this program.\n";

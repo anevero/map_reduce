@@ -15,30 +15,7 @@ MapReduce::~MapReduce() {
 }
 
 int MapReduce::ValidateFiles() const {
-  auto script_file_path = std::filesystem::path(script_);
-  auto src_file_path = std::filesystem::path(src_file_);
-  auto dst_file_path = std::filesystem::path(dst_file_);
-
-  if (!std::filesystem::exists(script_file_path) ||
-      !std::filesystem::is_regular_file(script_file_path)) {
-    std::cerr << "Script file '" << script_
-              << "' doesn't exist or isn't a regular file.\n";
-    return 1;
-  }
-
-  if (!std::filesystem::exists(src_file_path) ||
-      !std::filesystem::is_regular_file(src_file_path)) {
-    std::cerr << "Source file '" << src_file_
-              << "' doesn't exist or isn't a regular file.\n";
-    return 1;
-  }
-
-  if (std::filesystem::exists(dst_file_path)) {
-    std::clog << "Destination file '" << dst_file_
-              << "' already exists and will be overwritten.\n";
-  }
-
-  return 0;
+  return (ValidateFile(script_) == 1 || ValidateFile(src_file_) == 1) ? 1 : 0;
 }
 
 void MapReduce::SetOperation(Operation operation) {
@@ -62,33 +39,34 @@ int MapReduce::RunScript() {
     return RunMapScript(src_file_, dst_file_);
   }
 
-  int return_code = 0;
-  auto files = ShuffleAndSort();
-
-  int number_of_files = files.input_files.size();
-  for (int i = 0; i < number_of_files; ++i) {
-    return_code = RunReduceScript(files.input_files[i], files.output_files[i]);
-    if (return_code != 0) {
-      break;
-    }
-  }
+  auto files = CombinePairs();
+  int return_code = RunReduceScript(files);
 
   if (return_code != 0) {
     RemoveTemporaryFiles();
     return return_code;
   }
 
-  std::ofstream out(dst_file_);
-  for (auto&& file : files.output_files) {
-    std::ifstream in(file);
-    std::string current_line;
-    while (std::getline(in, current_line, LINES_DELIMITER)) {
-      out << current_line << LINES_DELIMITER;
-    }
-  }
+  // Creating a temporary file for unsorted pairs data.
+  temp_files_.push_back(bf::unique_path().native());
+  MergePairs(files.output_files, temp_files_.back());
+  SortPairs(temp_files_.back(), dst_file_);
 
   RemoveTemporaryFiles();
   return return_code;
+}
+
+int MapReduce::ValidateFile(const std::string& path) const {
+  auto file_path = std::filesystem::path(path);
+
+  if (!std::filesystem::exists(file_path) ||
+      !std::filesystem::is_regular_file(file_path)) {
+    std::cerr << "File '" << path
+              << "' doesn't exist or isn't a regular file.\n";
+    return 1;
+  }
+
+  return 0;
 }
 
 void MapReduce::RemoveTemporaryFiles() {
@@ -100,56 +78,116 @@ void MapReduce::RemoveTemporaryFiles() {
 }
 
 int MapReduce::RunMapScript(const std::string& src_file,
-                            const std::string& dst_file) {
+                            const std::string& dst_file) const {
   return bp::system(script_, bp::std_in < src_file, bp::std_out > dst_file);
 }
 
-int MapReduce::RunReduceScript(const std::string& src_file,
-                               const std::string& dst_file) {
-  return bp::system(script_, bp::std_in < src_file, bp::std_out > dst_file);
+int MapReduce::RunReduceScript(const ReduceTempFiles& files) const {
+  int number_of_files = files.input_files.size();
+  std::vector<bp::child> processes;
+  processes.reserve(number_of_files);
+
+  for (int i = 0; i < number_of_files; ++i) {
+    processes.emplace_back(script_,
+                           bp::std_in < files.input_files[i],
+                           bp::std_out > files.output_files[i]);
+  }
+
+  int return_code = 0;
+  for (int i = 0; i < number_of_files; ++i) {
+    processes[i].wait();
+    return_code += processes[i].exit_code();
+  }
+
+  return (return_code == 0) ? 0 : 1;
 }
 
-MapReduce::ReduceTempFiles MapReduce::ShuffleAndSort() {
-  std::map<std::string, std::vector<int>> pairs;
+MapReduce::ReduceTempFiles MapReduce::CombinePairs() {
+  std::unordered_map<std::string, std::vector<std::string>> pairs;
   std::ifstream in(src_file_);
 
   std::string current_line;
-  while (std::getline(in, current_line, LINES_DELIMITER)) {
+  while (std::getline(in, current_line, kLinesDelimiter)) {
     std::istringstream line_stream(current_line);
-    std::string key, value;
-    std::getline(line_stream, key, KEY_VALUE_DELIMITER);
-    std::getline(line_stream, value, LINES_DELIMITER);
-    pairs[key].push_back(std::stoi(value));
+    std::string key;
+    std::string value;  // always equal to "1" in our task
+    std::getline(line_stream, key, kKeyValueDelimiter);
+    std::getline(line_stream, value, kLinesDelimiter);
+    pairs[std::move(key)].push_back(std::move(value));
   }
   in.close();
 
-  int number_of_keys = pairs.size();
-  std::vector<std::string> input_files;
-  std::vector<std::string> output_files;
-  input_files.reserve(number_of_keys);
-  output_files.reserve(number_of_keys);
-  temp_files_.reserve(temp_files_.size() + 2 * number_of_keys);
-
-  std::string time = std::to_string(
-      std::chrono::duration(
-          std::chrono::system_clock::now().time_since_epoch()).count());
-  std::string temp_file_prefix = ".tmp." + time + ".";
-
-  for (int i = 0; i < number_of_keys; ++i) {
-    input_files.emplace_back(temp_file_prefix + "in." + std::to_string(i));
-    output_files.emplace_back(temp_file_prefix + "out." + std::to_string(i));
-    temp_files_.push_back(input_files.back());
-    temp_files_.push_back(output_files.back());
-  }
+  ReduceTempFiles files = CreateTempFiles(pairs.size());
 
   int i = 0;
   for (auto&&[key, values] : pairs) {
-    std::ofstream out(input_files[i]);
-    for (auto&& value : values) {
-      out << key << KEY_VALUE_DELIMITER << value << LINES_DELIMITER;
+    std::ofstream out(files.input_files[i]);
+    for (const auto& value : values) {
+      out << key << kKeyValueDelimiter << value << kLinesDelimiter;
     }
     ++i;
   }
 
+  return files;
+}
+
+MapReduce::ReduceTempFiles MapReduce::CreateTempFiles(int number_of_files) {
+  std::vector<std::string> input_files;
+  std::vector<std::string> output_files;
+  input_files.reserve(number_of_files);
+  output_files.reserve(number_of_files);
+  temp_files_.reserve(temp_files_.size() + 2 * number_of_files + 1);
+
+  for (int i = 0; i < number_of_files; ++i) {
+    input_files.push_back(bf::unique_path().native());
+    output_files.push_back(bf::unique_path().native());
+
+    temp_files_.push_back(input_files.back());
+    temp_files_.push_back(output_files.back());
+  }
+
   return {input_files, output_files};
+}
+
+void MapReduce::MergePairs(const std::vector<std::string>& files,
+                           const std::string& dst_file) const {
+  std::ofstream out(dst_file);
+  for (const auto& file : files) {
+    std::ifstream in(file);
+    std::string current_line;
+    while (std::getline(in, current_line, kLinesDelimiter)) {
+      out << current_line << kLinesDelimiter;
+    }
+  }
+}
+
+// External sorting will be later implemented / called here.
+void MapReduce::SortPairs(const std::string& src_file,
+                          const std::string& dst_file) const {
+  std::vector<std::pair<std::string, std::string>> pairs;
+
+  std::ifstream in(src_file);
+  std::string current_line;
+
+  while (std::getline(in, current_line, kLinesDelimiter)) {
+    std::string key;
+    std::string value;
+
+    std::istringstream line_stream(current_line);
+    std::getline(line_stream, key, kKeyValueDelimiter);
+    std::getline(line_stream, value, kLinesDelimiter);
+
+    pairs.emplace_back(std::move(key), std::move(value));
+  }
+
+  std::sort(pairs.begin(), pairs.end(), [](
+      const std::pair<std::string, std::string>& a,
+      const std::pair<std::string, std::string>& b) {
+    return a.first < b.first;
+  });
+
+  std::ofstream out(dst_file);
+  for (auto&&[key, value] : pairs) {
+    out << key << kKeyValueDelimiter << value << kLinesDelimiter;
+  }
 }

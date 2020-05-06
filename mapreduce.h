@@ -1,20 +1,21 @@
 #ifndef MAPREDUCE_H_
 #define MAPREDUCE_H_
 
-#include <chrono>
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
-#include <map>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include <boost/filesystem.hpp>
 #include <boost/process.hpp>
 
-namespace bp = boost::process;
+#include "constants.h"
 
-extern const char KEY_VALUE_DELIMITER;
-extern const char LINES_DELIMITER;
+namespace bp = boost::process;
+namespace bf = boost::filesystem;
 
 class MapReduce {
  public:
@@ -69,6 +70,12 @@ class MapReduce {
     std::vector<std::string> output_files;
   };
 
+  /// Checks if the passed file is a real file.
+  /// \retval 1 The file is empty or does not exist.
+  /// \retval 0 Everything seems OK right now, but nevertheless some problems
+  /// can appear later.
+  int ValidateFile(const std::string& path) const;
+
   /// Removes all the temporary files, which names are stored in the internal
   /// temp_files_ vector.
   void RemoveTemporaryFiles();
@@ -78,7 +85,8 @@ class MapReduce {
   /// \returns Script return value.
   /// \remark Map script uses stdin as the source and stdout as the
   /// destination. Input and output are redirected manually.
-  int RunMapScript(const std::string& src_file, const std::string& dst_file);
+  int RunMapScript(const std::string& src_file,
+                   const std::string& dst_file) const;
 
   /// Runs Reduce script, which uses the passed file as the source and
   /// destination file.
@@ -86,13 +94,27 @@ class MapReduce {
   /// \returns Script return value.
   /// \remark Reduce script uses stdin as the source and stdout as the
   /// destination. Input and output are redirected manually.
-  int RunReduceScript(const std::string& src_file, const std::string& dst_file);
+  int RunReduceScript(const ReduceTempFiles& files) const;
 
-  /// Loads all the data from the source file to the memory, sorts it,
+  /// Loads all the data from the source file to the memory,
   /// divides it on clusters according to the keys, writes these
   /// clusters to the created temporary files.
   /// \returns Struct of two vectors (of created temporary files names).
-  ReduceTempFiles ShuffleAndSort();
+  ReduceTempFiles CombinePairs();
+
+  /// A helper function for the OrderPairs function. Creates the necessary
+  /// number of temporary files.
+  /// \returns Struct of two vectors (of created temporary files names).
+  ReduceTempFiles CreateTempFiles(int number_of_files);
+
+  /// Merges the pairs from all the passed files into one file.
+  void MergePairs(const std::vector<std::string>& files,
+                  const std::string& dst_file) const;
+
+  /// Sorts the pairs in the source file and writes the output to the
+  /// destination file.
+  void SortPairs(const std::string& src_file,
+                 const std::string& dst_file) const;
 
  private:
   Operation operation_;
