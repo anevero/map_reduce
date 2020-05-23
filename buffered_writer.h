@@ -1,5 +1,5 @@
-#ifndef MAPREDUCE_BUFFERED_WRITER_H_
-#define MAPREDUCE_BUFFERED_WRITER_H_
+#ifndef BUFFERED_WRITER_H_
+#define BUFFERED_WRITER_H_
 
 #include <fstream>
 #include <sstream>
@@ -47,4 +47,4 @@ BufferedWriter& BufferedWriter::operator<<(T number) {
   return *this;
 }
 
-#endif  // MAPREDUCE_BUFFERED_WRITER_H_
+#endif  // BUFFERED_WRITER_H_

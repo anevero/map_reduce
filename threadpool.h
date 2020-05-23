@@ -14,8 +14,8 @@
 // Source:
 // https://github.com/google/or-tools/blob/v7.4/ortools/base/threadpool.h
 
-#ifndef MAPREDUCE_THREADPOOL_H_
-#define MAPREDUCE_THREADPOOL_H_
+#ifndef THREADPOOL_H_
+#define THREADPOOL_H_
 
 #include <condition_variable>
 #include <functional>
@@ -45,4 +45,4 @@ class ThreadPool {
   bool started_ = false;
 };
 
-#endif  // MAPREDUCE_THREADPOOL_H_
+#endif  // THREADPOOL_H_

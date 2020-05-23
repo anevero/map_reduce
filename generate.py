@@ -7,11 +7,11 @@ sites = ["bsu.by", "fpmi.bsu.by", "student.bsu.by", "edufpmi.bsu.by",
          "webmail.bsu.by", "elib.bsu.by", "library.bsu.by",
          "acm.bsu.by", "acm.bsu.by/courses/122", "acm.bsu.by/wiki"]
 
-number_of_users = 5000
+number_of_users = 2000
 number_of_entries = 500000
 data = [{} for i in range(number_of_users)]
 
-input_file = open("./cmake-build-release/map_in_2", "w+")
+input_file = open("./cmake-build-release/map_in", "w+")
 
 for i in range(number_of_entries):
     user = random.randint(0, number_of_users - 1)

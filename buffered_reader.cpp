@@ -1,6 +1,8 @@
 #include "buffered_reader.h"
 #include "constants.h"
 
+#include <utility>
+
 BufferedReader::BufferedReader(const std::string& src_file)
     : input_stream_(src_file) {}
 

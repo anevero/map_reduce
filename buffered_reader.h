@@ -1,5 +1,5 @@
-#ifndef MAPREDUCE_BUFFERED_READER_H_
-#define MAPREDUCE_BUFFERED_READER_H_
+#ifndef BUFFERED_READER_H_
+#define BUFFERED_READER_H_
 
 #include <deque>
 #include <fstream>
@@ -21,4 +21,4 @@ class BufferedReader {
   std::deque<std::string> cache_;
 };
 
-#endif  // MAPREDUCE_BUFFERED_READER_H_
+#endif  // BUFFERED_READER_H_

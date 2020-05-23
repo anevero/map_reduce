@@ -2,8 +2,8 @@
 // of some project-wide functions. It helps to divide the logic of the project
 // and allows to easily change, for example, some parsing logic in the future.
 
-#ifndef MAPREDUCE_UTILS_H_
-#define MAPREDUCE_UTILS_H_
+#ifndef UTILS_H_
+#define UTILS_H_
 
 #include <cstdint>
 #include <string>
