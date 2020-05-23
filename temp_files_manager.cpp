@@ -68,28 +68,44 @@ void TempFilesManager::CreateTemporaryFilesByKeys(
 
 int TempFilesManager::RunScriptOnTemporaryFiles(
     const std::string& script_path) {
-  // TODO(anevero): do not run >10000 processes at the same time (they will
-  //  fail due to lack of pids).
-
   int number_of_processes = temp_files_.size();
+  int completed_processes = 0;
+  int processes_per_cycle =
+      kNumberOfProcessesMultiplier * std::thread::hardware_concurrency();
+
   std::vector<bp::child> processes;
   processes.reserve(number_of_processes);
 
-  for (int i = 0; i < number_of_processes; ++i) {
-    processes.emplace_back(script_path, temp_files_[i], temp_files_[i]);
+  while (completed_processes < number_of_processes) {
+    int processes_to_run = std::min(
+        processes_per_cycle,
+        number_of_processes - completed_processes);
+
+    for (int i = completed_processes;
+         i < completed_processes + processes_to_run; ++i) {
+      processes.emplace_back(script_path, temp_files_[i], temp_files_[i]);
+    }
+
+    int return_code = 0;
+    for (auto& process : processes) {
+      process.wait();
+      return_code += process.exit_code();
+    }
+
+    if (return_code != 0) {
+      return 1;
+    }
+
+    processes.clear();
+    completed_processes += processes_to_run;
   }
 
-  int return_code = 0;
-  for (int i = 0; i < number_of_processes; ++i) {
-    processes[i].wait();
-    return_code += processes[i].exit_code();
-  }
-
-  return (return_code == 0) ? 0 : 1;
+  return 0;
 }
 
 void TempFilesManager::SortLinesInTemporaryFiles() {
-  ThreadPool threadpool(4 * std::thread::hardware_concurrency());
+  ThreadPool threadpool(
+      kNumberOfThreadsMultiplier * std::thread::hardware_concurrency());
   for (const auto& file : temp_files_) {
     threadpool.Schedule([this, &file] { SortTemporaryFile(file); });
   }

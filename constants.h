@@ -9,4 +9,7 @@ const int kNumberOfLinesInBlock = 50000;  // 50000
 const int kReadBufferNumberOfLines = 7500;  // 7500
 const int kWriteBufferLength = 75000;
 
+const int kNumberOfProcessesMultiplier = 3;
+const int kNumberOfThreadsMultiplier = 3;
+
 #endif  // CONSTANTS_H_
