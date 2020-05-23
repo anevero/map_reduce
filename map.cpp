@@ -1,42 +1,91 @@
+// This script is used to convert the data from one format to another.
+
+// Input format (non-binary):
+// site_string \t user_id \t time \n
+// ...
+// site_string \t user_id \t time \n
+
+// Output format (non-binary):
+// user_id \t site \t time
+// ...
+// user_id \t site \t time
+
+// The first argument to the script should be the name of the input file, the
+// second - the name of the output file.
+
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <vector>
+#include <unordered_map>
+#include <utility>
 
+#include "buffered_reader.h"
+#include "buffered_writer.h"
 #include "constants.h"
+#include "utils.h"
 
-std::vector<std::string> ReadPairs() {
-  std::vector<std::string> words;
+struct SiteVisitEntry {
+  SiteAddress site_address;
+  Time time;
+
+  SiteVisitEntry() : site_address(), time(0) {}
+
+  SiteVisitEntry(SiteAddress site_address, Time time)
+      : site_address(std::move(site_address)), time(time) {}
+};
+
+std::unordered_multimap<UserId, SiteVisitEntry> ReadEntries(
+    const std::string& src_file) {
+  std::unordered_multimap<UserId, SiteVisitEntry> entries;
+
+  BufferedReader reader(src_file);
   std::string current_line;
 
-  while (std::getline(std::cin, current_line, kLinesDelimiter)) {
-    std::string key;  // word "key" in this task
-    std::string word;
+  while (reader.ReadLine(&current_line)) {
+    UserId user_id;
+    SiteAddress site_address;
+    Time time;
 
     std::istringstream line_stream(current_line);
-    std::getline(line_stream, key, kKeyValueDelimiter);
-    while (std::getline(line_stream, word, kWordsDelimiter)) {
-      words.push_back(std::move(word));
-    }
+    std::string current_string;
+
+    std::getline(line_stream, current_string, kKeyValueDelimiter);
+    site_address = ParseSiteAddressFromString(std::move(current_string));
+
+    std::getline(line_stream, current_string, kKeyValueDelimiter);
+    user_id = ParseUserIdFromString(current_string);
+
+    std::getline(line_stream, current_string, kKeyValueDelimiter);
+    time = ParseTimeFromString(current_string);
+
+    entries.emplace(user_id, SiteVisitEntry{site_address, time});
   }
 
-  return words;
+  return entries;
 }
 
-void WritePairs(const std::vector<std::string>& words) {
-  std::cin.tie(nullptr);
-  std::ios::sync_with_stdio(false);
+void WriteEntries(
+    const std::unordered_multimap<UserId, SiteVisitEntry>& entries,
+    const std::string& dst_file) {
+  BufferedWriter writer(dst_file);
+  for (auto&&[user_id, entry] : entries) {
+    writer << user_id << kKeyValueDelimiter << entry.site_address
+           << kKeyValueDelimiter << entry.time << kLinesDelimiter;
+  }
+}
 
-  for (auto& word : words) {
-    std::cout << word << kKeyValueDelimiter << 1 << kLinesDelimiter;
+int main(int argc, char* argv[]) {
+  if (argc < 3) {
+    std::cerr << "Not enough arguments for this program." << std::endl;
+    return 1;
   }
 
-  std::cin.tie(&std::cout);
-  std::ios::sync_with_stdio(true);
-}
+  if (ValidateFile(argv[1]) != 0) {
+    std::cerr << "Input file path is incorrect." << std::endl;
+    return 1;
+  }
 
-int main() {
-  WritePairs(ReadPairs());
+  WriteEntries(ReadEntries(argv[1]), argv[2]);
 
   return 0;
 }

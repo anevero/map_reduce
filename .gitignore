@@ -2,4 +2,3 @@
 /cmake-build-release/
 /.idea/
 /__pycache__/
-/generate.py
