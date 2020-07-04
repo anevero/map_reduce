@@ -21,18 +21,18 @@ void TempFilesManager::CreateTemporaryFilesByBlockSize(
   BufferedReader reader(src_file);
   BufferedWriter writer;
 
-  int lines_in_current_file = kNumberOfLinesInBlock;
+  int lines_in_current_file = constants::kNumberOfLinesInBlock;
   std::string current_line;
 
   while (reader.ReadLine(&current_line)) {
-    if (lines_in_current_file >= kNumberOfLinesInBlock) {
+    if (lines_in_current_file >= constants::kNumberOfLinesInBlock) {
       writer.Close();
       CreateTemporaryFile();
       writer.Open(temp_files_.back());
       lines_in_current_file = 0;
     }
 
-    writer << current_line << kLinesDelimiter;
+    writer << current_line << constants::kLinesDelimiter;
     ++lines_in_current_file;
   }
 }
@@ -49,7 +49,7 @@ void TempFilesManager::CreateTemporaryFilesByKeys(
     std::istringstream stream(current_line);
 
     std::string current_key;
-    std::getline(stream, current_key, kKeyValueDelimiter);
+    std::getline(stream, current_key, constants::kKeyValueDelimiter);
 
     if (current_key != previous_key) {
       writer.Close();
@@ -59,10 +59,10 @@ void TempFilesManager::CreateTemporaryFilesByKeys(
     }
 
     std::string current_value;
-    std::getline(stream, current_value, kLinesDelimiter);
+    std::getline(stream, current_value, constants::kLinesDelimiter);
 
-    writer << current_key << kKeyValueDelimiter << current_value
-           << kLinesDelimiter;
+    writer << current_key << constants::kKeyValueDelimiter
+           << current_value << constants::kLinesDelimiter;
   }
 }
 
@@ -70,8 +70,8 @@ int TempFilesManager::RunScriptOnTemporaryFiles(
     const std::string& script_path) {
   int number_of_processes = temp_files_.size();
   int completed_processes = 0;
-  int processes_per_cycle =
-      kNumberOfProcessesMultiplier * std::thread::hardware_concurrency();
+  int processes_per_cycle = constants::kNumberOfProcessesMultiplier *
+      std::thread::hardware_concurrency();
 
   std::vector<bp::child> processes;
   processes.reserve(number_of_processes);
@@ -104,8 +104,8 @@ int TempFilesManager::RunScriptOnTemporaryFiles(
 }
 
 void TempFilesManager::SortLinesInTemporaryFiles() {
-  ThreadPool threadpool(
-      kNumberOfThreadsMultiplier * std::thread::hardware_concurrency());
+  ThreadPool threadpool(constants::kNumberOfThreadsMultiplier *
+      std::thread::hardware_concurrency());
   for (const auto& file : temp_files_) {
     threadpool.Schedule([this, &file] { SortTemporaryFile(file); });
   }
@@ -147,7 +147,7 @@ void TempFilesManager::MergeSortedTemporaryFiles(
   std::make_heap(heap.begin(), heap.end());
 
   while (!heap.empty()) {
-    writer << heap.front().line << kLinesDelimiter;
+    writer << heap.front().line << constants::kLinesDelimiter;
     std::pop_heap(heap.begin(), heap.end());
     if (readers[heap.back().file_number].ReadLine(&heap.back().line)) {
       std::push_heap(heap.begin(), heap.end());
@@ -171,7 +171,7 @@ void TempFilesManager::CreateTemporaryFile() {
 
 void TempFilesManager::SortTemporaryFile(const std::string& file) {
   std::vector<std::string> lines;
-  lines.reserve(kNumberOfLinesInBlock);
+  lines.reserve(constants::kNumberOfLinesInBlock);
 
   BufferedReader reader(file);
   std::string current_line;
@@ -184,6 +184,6 @@ void TempFilesManager::SortTemporaryFile(const std::string& file) {
 
   BufferedWriter writer(file);
   for (const auto& line : lines) {
-    writer << line << kLinesDelimiter;
+    writer << line << constants::kLinesDelimiter;
   }
 }

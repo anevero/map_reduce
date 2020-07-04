@@ -24,6 +24,10 @@
 #include "constants.h"
 #include "utils.h"
 
+using utils::UserId;
+using utils::SiteAddress;
+using utils::Time;
+
 struct SiteVisitEntry {
   SiteAddress site_address;
   Time time;
@@ -49,14 +53,18 @@ std::unordered_multimap<UserId, SiteVisitEntry> ReadEntries(
     std::istringstream line_stream(current_line);
     std::string current_string;
 
-    std::getline(line_stream, current_string, kKeyValueDelimiter);
-    site_address = ParseSiteAddressFromString(std::move(current_string));
+    std::getline(line_stream, current_string,
+                 constants::kKeyValueDelimiter);
+    site_address = utils::ParseSiteAddressFromString(
+        std::move(current_string));
 
-    std::getline(line_stream, current_string, kKeyValueDelimiter);
-    user_id = ParseUserIdFromString(current_string);
+    std::getline(line_stream, current_string,
+                 constants::kKeyValueDelimiter);
+    user_id = utils::ParseUserIdFromString(current_string);
 
-    std::getline(line_stream, current_string, kKeyValueDelimiter);
-    time = ParseTimeFromString(current_string);
+    std::getline(line_stream, current_string,
+                 constants::kKeyValueDelimiter);
+    time = utils::ParseTimeFromString(current_string);
 
     entries.emplace(user_id, SiteVisitEntry{site_address, time});
   }
@@ -69,8 +77,9 @@ void WriteEntries(
     const std::string& dst_file) {
   BufferedWriter writer(dst_file);
   for (auto&&[user_id, entry] : entries) {
-    writer << user_id << kKeyValueDelimiter << entry.site_address
-           << kKeyValueDelimiter << entry.time << kLinesDelimiter;
+    writer << user_id << constants::kKeyValueDelimiter
+           << entry.site_address << constants::kKeyValueDelimiter
+           << entry.time << constants::kLinesDelimiter;
   }
 }
 
@@ -80,7 +89,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  if (ValidateFile(argv[1]) != 0) {
+  if (utils::ValidateFile(argv[1]) != 0) {
     std::cerr << "Input file path is incorrect." << std::endl;
     return 1;
   }

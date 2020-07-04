@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 
+#include "constants.h"
 #include "temp_files_manager.h"
 #include "utils.h"
 
@@ -45,22 +46,23 @@ int main(int argc, char* argv[]) {
   std::string src_file = argv[3];
   std::string dst_file = argv[4];
 
-  if (str_operation != "map" && str_operation != "reduce") {
+  if (str_operation != constants::kMapOperationString
+      && str_operation != constants::kReduceOperationString) {
     std::cerr << "Undefined operation '" << str_operation << "'." << std::endl;
     return 1;
   }
 
-  if (ValidateFile(script) != 0) {
+  if (utils::ValidateFile(script) != 0) {
     std::cerr << "Script file '" << script << "' is incorrect." << std::endl;
     return 1;
   }
 
-  if (ValidateFile(src_file) != 0) {
+  if (utils::ValidateFile(src_file) != 0) {
     std::cerr << "Source file '" << src_file << "' is incorrect." << std::endl;
     return 1;
   }
 
-  if (str_operation == "map") {
+  if (str_operation == constants::kMapOperationString) {
     return RunMapScript(script, src_file, dst_file);
   }
 

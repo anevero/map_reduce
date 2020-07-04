@@ -34,8 +34,9 @@ bool BufferedReader::ReadLine(std::string* string) {
 
 void BufferedReader::Buffer() {
   std::string current_line;
-  while (cache_.size() < kReadBufferNumberOfLines
-      && std::getline(input_stream_, current_line, kLinesDelimiter)) {
+  while (cache_.size() < constants::kReadBufferNumberOfLines
+      && std::getline(input_stream_, current_line,
+                      constants::kLinesDelimiter)) {
     cache_.push_back(std::move(current_line));
   }
 }

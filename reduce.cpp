@@ -27,6 +27,10 @@
 #include "constants.h"
 #include "utils.h"
 
+using utils::UserId;
+using utils::SiteAddress;
+using utils::Time;
+
 class SiteInfo {
  public:
   SiteInfo(const SiteAddress& site_address,
@@ -42,8 +46,9 @@ class SiteInfo {
 
   std::string ToString() const {
     std::ostringstream stream;
-    stream << site_address_ << kKeyValueDelimiter << average_time_
-           << kKeyValueDelimiter << min_time_ << kKeyValueDelimiter
+    stream << site_address_ << constants::kKeyValueDelimiter
+           << average_time_ << constants::kKeyValueDelimiter
+           << min_time_ << constants::kKeyValueDelimiter
            << max_time_;
     return stream.str();
   }
@@ -70,8 +75,9 @@ auto ReadEntries(const std::string& src_file) {
     std::istringstream line_stream(current_line);
     std::string current_string;
 
-    std::getline(line_stream, current_string, kKeyValueDelimiter);
-    user_id = ParseUserIdFromString(current_string);
+    std::getline(line_stream, current_string,
+                 constants::kKeyValueDelimiter);
+    user_id = utils::ParseUserIdFromString(current_string);
     if (id == static_cast<UserId>(-1)) {
       id = user_id;
     } else if (user_id != id) {
@@ -79,11 +85,14 @@ auto ReadEntries(const std::string& src_file) {
       continue;
     }
 
-    std::getline(line_stream, current_string, kKeyValueDelimiter);
-    site_address = ParseSiteAddressFromString(std::move(current_string));
+    std::getline(line_stream, current_string,
+                 constants::kKeyValueDelimiter);
+    site_address = utils::ParseSiteAddressFromString(
+        std::move(current_string));
 
-    std::getline(line_stream, current_string, kKeyValueDelimiter);
-    time = ParseTimeFromString(current_string);
+    std::getline(line_stream, current_string,
+                 constants::kKeyValueDelimiter);
+    time = utils::ParseTimeFromString(current_string);
 
     entries[std::move(site_address)].push_back(time);
   }
@@ -104,9 +113,9 @@ std::vector<SiteInfo> ConvertEntries(
 void WriteEntries(UserId user_id, const std::vector<SiteInfo>& sites_info,
                   const std::string& dst_file) {
   BufferedWriter writer(dst_file);
-  writer << "User #" << user_id << ":" << kLinesDelimiter;
+  writer << "User #" << user_id << ":" << constants::kLinesDelimiter;
   for (const auto& site : sites_info) {
-    writer << site.ToString() << kLinesDelimiter;
+    writer << site.ToString() << constants::kLinesDelimiter;
   }
 }
 
@@ -116,7 +125,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  if (ValidateFile(argv[1]) != 0) {
+  if (utils::ValidateFile(argv[1]) != 0) {
     std::cerr << "Input file path is incorrect." << std::endl;
     return 1;
   }

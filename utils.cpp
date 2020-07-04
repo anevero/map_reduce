@@ -3,6 +3,8 @@
 
 #include <iostream>
 
+namespace utils {
+
 namespace bf = boost::filesystem;
 
 UserId ParseUserIdFromString(const std::string& string) {
@@ -40,3 +42,5 @@ int ValidateFile(const std::string& path) {
 
   return 0;
 }
+
+}  // namespace utils

@@ -32,7 +32,7 @@ void BufferedWriter::WriteChar(char c) {
   ++cache_length_;
   cache_ << c;
 
-  if (cache_length_ >= kWriteBufferLength) {
+  if (cache_length_ >= constants::kWriteBufferLength) {
     Flush();
   }
 }
@@ -41,7 +41,7 @@ void BufferedWriter::WriteString(const std::string& string) {
   cache_length_ += string.length();
   cache_ << string;
 
-  if (cache_length_ >= kWriteBufferLength) {
+  if (cache_length_ >= constants::kWriteBufferLength) {
     Flush();
   }
 }
@@ -50,7 +50,7 @@ void BufferedWriter::WriteCStyleString(const char* string) {
   cache_length_ += std::strlen(string);
   cache_ << string;
 
-  if (cache_length_ >= kWriteBufferLength) {
+  if (cache_length_ >= constants::kWriteBufferLength) {
     Flush();
   }
 }

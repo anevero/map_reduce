@@ -8,7 +8,7 @@ sites = ["bsu.by", "fpmi.bsu.by", "student.bsu.by", "edufpmi.bsu.by",
          "acm.bsu.by", "acm.bsu.by/courses/122", "acm.bsu.by/wiki"]
 
 number_of_users = 2000
-number_of_entries = 500000
+number_of_entries = 2000000
 data = [{} for i in range(number_of_users)]
 
 input_file = open("./cmake-build-release/map_in", "w+")

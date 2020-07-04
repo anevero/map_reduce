@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <string>
 
+namespace utils {
+
 using UserId = uint64_t;
 using SiteAddress = std::string;
 using Time = uint64_t;
@@ -17,5 +19,7 @@ SiteAddress ParseSiteAddressFromString(std::string string);
 Time ParseTimeFromString(const std::string& string);
 
 int ValidateFile(const std::string& path);
+
+}  // namespace utils
 
 #endif  // UTILS_H_
