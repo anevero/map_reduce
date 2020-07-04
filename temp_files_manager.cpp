@@ -1,15 +1,19 @@
 #include "buffered_reader.h"
 #include "buffered_writer.h"
 #include "constants.h"
+#include "process_manager.h"
 #include "temp_files_manager.h"
 #include "threadpool.h"
 
 #include <algorithm>
+#include <boost/filesystem.hpp>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <utility>
 #include <vector>
+
+namespace bf = boost::filesystem;
 
 TempFilesManager::~TempFilesManager() {
   RemoveTemporaryFiles();
@@ -17,7 +21,6 @@ TempFilesManager::~TempFilesManager() {
 
 void TempFilesManager::CreateTemporaryFilesByBlockSize(
     const std::string& src_file) {
-
   BufferedReader reader(src_file);
   BufferedWriter writer;
 
@@ -68,39 +71,8 @@ void TempFilesManager::CreateTemporaryFilesByKeys(
 
 int TempFilesManager::RunScriptOnTemporaryFiles(
     const std::string& script_path) {
-  int number_of_processes = temp_files_.size();
-  int completed_processes = 0;
-  int processes_per_cycle = constants::kNumberOfProcessesMultiplier *
-      std::thread::hardware_concurrency();
-
-  std::vector<bp::child> processes;
-  processes.reserve(number_of_processes);
-
-  while (completed_processes < number_of_processes) {
-    int processes_to_run = std::min(
-        processes_per_cycle,
-        number_of_processes - completed_processes);
-
-    for (int i = completed_processes;
-         i < completed_processes + processes_to_run; ++i) {
-      processes.emplace_back(script_path, temp_files_[i], temp_files_[i]);
-    }
-
-    int return_code = 0;
-    for (auto& process : processes) {
-      process.wait();
-      return_code += process.exit_code();
-    }
-
-    if (return_code != 0) {
-      return 1;
-    }
-
-    processes.clear();
-    completed_processes += processes_to_run;
-  }
-
-  return 0;
+  ProcessManager process_manager(temp_files_);
+  return process_manager.RunAndWait(script_path);
 }
 
 void TempFilesManager::SortLinesInTemporaryFiles() {

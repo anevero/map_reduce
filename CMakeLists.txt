@@ -7,7 +7,7 @@ set(CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} "-pthread -lboost_system -l
 
 find_package(Boost 1.65.1 REQUIRED COMPONENTS filesystem)
 
-add_executable(mapreduce mapreduce.cpp buffered_reader.cpp buffered_writer.cpp temp_files_manager.cpp threadpool.cpp utils.cpp)
+add_executable(mapreduce mapreduce.cpp buffered_reader.cpp buffered_writer.cpp process_manager.cpp temp_files_manager.cpp threadpool.cpp utils.cpp)
 
 add_executable(map map.cpp buffered_reader.cpp buffered_writer.cpp utils.cpp)
 

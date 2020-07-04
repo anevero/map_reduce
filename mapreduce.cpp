@@ -1,9 +1,12 @@
+#include <boost/filesystem.hpp>
 #include <iostream>
 #include <string>
 
 #include "constants.h"
 #include "temp_files_manager.h"
 #include "utils.h"
+
+namespace bf = boost::filesystem;
 
 int RunMapScript(const std::string& script,
                  const std::string& src_file,

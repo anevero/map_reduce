@@ -1,13 +1,8 @@
 #ifndef TEMP_FILES_MANAGER_H_
 #define TEMP_FILES_MANAGER_H_
 
-#include <boost/filesystem.hpp>
-#include <boost/process.hpp>
 #include <string>
 #include <vector>
-
-namespace bf = boost::filesystem;
-namespace bp = boost::process;
 
 class TempFilesManager {
  public:
