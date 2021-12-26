@@ -1,7 +1,4 @@
-#include "mapreduce_lib/temp_files_manager.h"
-#include "buffered_io/buffered_reader.h"
-#include "buffered_io/buffered_writer.h"
-#include "utils/constants.h"
+#include "mapreduce_lib/file_operations_manager.h"
 
 #include <algorithm>
 #include <iostream>
@@ -9,21 +6,28 @@
 #include <vector>
 
 #include <boost/filesystem.hpp>
-
 #include "data_piece.pb.h"
-#include "mapreduce_lib/process_manager.h"
+
+#include "buffered_io/buffered_reader.h"
+#include "buffered_io/buffered_writer.h"
 #include "mapreduce_lib/threadpool.h"
+#include "utils/constants.h"
 
 namespace bf = boost::filesystem;
 
-TempFilesManager::~TempFilesManager() {
-  RemoveTemporaryFiles();
+FileOperationsManager::~FileOperationsManager() {
+  RemoveAllTemporaryFiles();
 }
 
-void TempFilesManager::CreateTemporaryFilesByBlockSize(
+std::string FileOperationsManager::GetFilenameById(int file_id) const {
+  return temp_files_.at(file_id);
+}
+
+std::vector<int> FileOperationsManager::DivideFileByBlockSize(
     const std::string& src_file) {
   BufferedReader reader(src_file);
   BufferedWriter writer;
+  std::vector<int> result_files_ids;
 
   int lines_in_current_file = constants::kNumberOfLinesInBlock;
   DataPiece entry;
@@ -36,20 +40,26 @@ void TempFilesManager::CreateTemporaryFilesByBlockSize(
 
     if (lines_in_current_file >= constants::kNumberOfLinesInBlock) {
       writer.Close();
-      CreateTemporaryFile();
-      writer.Open(temp_files_.back());
+
+      int new_file_id = CreateTemporaryFile();
+      result_files_ids.push_back(new_file_id);
+
+      writer.Open(GetFilenameById(new_file_id));
       lines_in_current_file = 0;
     }
 
     writer << entry;
     ++lines_in_current_file;
   }
+
+  return result_files_ids;
 }
 
-void TempFilesManager::CreateTemporaryFilesByKeys(
+std::vector<int> FileOperationsManager::DivideFileByKey(
     const std::string& src_file) {
   BufferedReader reader(src_file);
   BufferedWriter writer;
+  std::vector<int> result_files_ids;
 
   std::string previous_key = {};
   DataPiece entry;
@@ -62,42 +72,43 @@ void TempFilesManager::CreateTemporaryFilesByKeys(
 
     if (entry.key() != previous_key) {
       writer.Close();
-      CreateTemporaryFile();
-      writer.Open(temp_files_.back());
+
+      int new_file_id = CreateTemporaryFile();
+      result_files_ids.push_back(new_file_id);
+
+      writer.Open(GetFilenameById(new_file_id));
       previous_key = entry.key();
     }
 
     writer << entry;
   }
+
+  return result_files_ids;
 }
 
-void TempFilesManager::RunScriptOnTemporaryFiles(
-    const std::string& script_path) {
-  ProcessManager process_manager(temp_files_);
-  process_manager.RunAndWait(script_path);
+void FileOperationsManager::MergeTemporaryFiles(
+    const std::vector<int>& files_ids, const std::string& dst_file) {
+  std::ofstream out(dst_file, std::ios::binary);
+  for (int file_id: files_ids) {
+    std::ifstream in(GetFilenameById(file_id), std::ios_base::binary);
+    out << in.rdbuf();
+    RemoveTemporaryFile(file_id);
+  }
 }
 
-void TempFilesManager::SortLinesInTemporaryFiles() {
+void FileOperationsManager::SortLinesInTemporaryFiles(
+    const std::vector<int>& files_ids) const {
   ThreadPool thread_pool(constants::kNumberOfThreadsMultiplier *
       std::thread::hardware_concurrency());
-  for (const auto& file: temp_files_) {
-    thread_pool.Schedule([this, &file] { SortTemporaryFile(file); });
+  for (int file_id: files_ids) {
+    thread_pool.Schedule([this, file_id] { SortTemporaryFile(file_id); });
   }
   thread_pool.StartWorkers();
 }
 
-void TempFilesManager::MergeTemporaryFiles(
-    const std::string& dst_file) const {
-  std::ofstream out(dst_file, std::ios::binary);
-  for (const auto& file: temp_files_) {
-    std::ifstream in(file, std::ios_base::binary);
-    out << in.rdbuf();
-  }
-}
-
-void TempFilesManager::MergeSortedTemporaryFiles(
-    const std::string& dst_file) const {
-  int number_of_files = temp_files_.size();
+void FileOperationsManager::MergeSortedTemporaryFiles(
+    const std::vector<int>& files_ids, const std::string& dst_file) {
+  int number_of_files = files_ids.size();
   BufferedWriter writer(dst_file);
   std::vector<BufferedReader> readers(number_of_files);
   for (int i = 0; i < number_of_files; ++i) {
@@ -134,25 +145,50 @@ void TempFilesManager::MergeSortedTemporaryFiles(
       std::push_heap(heap.begin(), heap.end());
     }
   }
+
+  RemoveTemporaryFiles(files_ids);
 }
 
-void TempFilesManager::RemoveTemporaryFiles() {
-  while (!temp_files_.empty()) {
-    bf::remove(temp_files_.back());
-    temp_files_.pop_back();
+std::vector<int> FileOperationsManager::CreateTemporaryFiles(int count) {
+  std::vector<int> files_ids;
+  files_ids.reserve(count);
+  for (int i = 0; i < count; ++i) {
+    files_ids.push_back(CreateTemporaryFile());
+  }
+  return files_ids;
+}
+
+void FileOperationsManager::RemoveTemporaryFiles(
+    const std::vector<int>& files_ids) {
+  for (int file_id: files_ids) {
+    RemoveTemporaryFile(file_id);
   }
 }
 
-void TempFilesManager::CreateTemporaryFile() {
-  temp_files_.push_back(bf::unique_path().native());
-  std::ofstream temp_stream(temp_files_.back());
+void FileOperationsManager::RemoveAllTemporaryFiles() {
+  while (!temp_files_.empty()) {
+    RemoveTemporaryFile(temp_files_.begin()->first);
+  }
 }
 
-void TempFilesManager::SortTemporaryFile(const std::string& file) {
+int FileOperationsManager::CreateTemporaryFile() {
+  int id = current_file_id_++;
+  std::string filename = bf::unique_path().native();
+  std::ofstream temp_stream(filename);
+  temp_files_.emplace(id, std::move(filename));
+  return id;
+}
+
+void FileOperationsManager::RemoveTemporaryFile(int file_id) {
+  bf::remove(temp_files_.at(file_id));
+  temp_files_.erase(file_id);
+}
+
+void FileOperationsManager::SortTemporaryFile(int file_id) const {
   std::vector<DataPiece> entries;
   entries.reserve(constants::kNumberOfLinesInBlock);
 
-  BufferedReader reader(file);
+  BufferedReader reader(GetFilenameById(file_id));
   while (true) {
     auto new_entry = reader.ReadDataPiece();
     if (new_entry.key().empty()) {
@@ -171,7 +207,7 @@ void TempFilesManager::SortTemporaryFile(const std::string& file) {
               return a.key() < b.key();
             });
 
-  BufferedWriter writer(file);
+  BufferedWriter writer(GetFilenameById(file_id));
   for (const auto& entry: entries) {
     writer << entry;
   }

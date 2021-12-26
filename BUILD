@@ -46,13 +46,13 @@ cc_library(
 cc_library(
     name = "mapreduce_lib",
     srcs = [
+        "mapreduce_lib/file_operations_manager.cpp",
         "mapreduce_lib/process_manager.cpp",
-        "mapreduce_lib/temp_files_manager.cpp",
         "mapreduce_lib/threadpool.cpp",
     ],
     hdrs = [
+        "mapreduce_lib/file_operations_manager.h",
         "mapreduce_lib/process_manager.h",
-        "mapreduce_lib/temp_files_manager.h",
         "mapreduce_lib/threadpool.h",
     ],
     linkopts = ["-lpthread"],

@@ -10,14 +10,14 @@
 
 namespace bp = boost::process;
 
-ProcessManager::ProcessManager(const std::vector<std::string>& temp_files)
-    : temp_files_(temp_files) {}
-
-void ProcessManager::RunAndWait(const std::string& script_path) {
-  int processes_number = temp_files_.size();
+void ProcessManager::RunAndWait(
+    const std::string& script_path,
+    const std::vector<int>& input_files_ids,
+    const std::vector<int>& output_files_ids,
+    const FileOperationsManager& file_operations_manager) {
+  int processes_number = input_files_ids.size();
   int processes_per_cycle = constants::kNumberOfProcessesMultiplier *
       std::thread::hardware_concurrency();
-
   if (processes_per_cycle == 0) {
     processes_per_cycle = constants::kNumberOfProcessesMultiplier;
   }
@@ -45,7 +45,9 @@ void ProcessManager::RunAndWait(const std::string& script_path) {
 
     for (auto&[index, process]: processes) {
       process = std::make_unique<bp::child>(
-          script_path, temp_files_[index], temp_files_[index]);
+          script_path,
+          file_operations_manager.GetFilenameById(input_files_ids[index]),
+          file_operations_manager.GetFilenameById(output_files_ids[index]));
     }
 
     auto it = processes.begin();
