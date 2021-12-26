@@ -14,7 +14,7 @@ class TempFilesManager {
   void CreateTemporaryFilesByBlockSize(const std::string& src_file);
   void CreateTemporaryFilesByKeys(const std::string& src_file);
 
-  absl::Status RunScriptOnTemporaryFiles(const std::string& script_path);
+  void RunScriptOnTemporaryFiles(const std::string& script_path);
   void SortLinesInTemporaryFiles();
 
   void MergeTemporaryFiles(const std::string& dst_file) const;

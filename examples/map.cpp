@@ -15,11 +15,12 @@
 #include <utility>
 #include <vector>
 
+#include "absl/random/random.h"
+#include "data_piece.pb.h"
+
 #include "buffered_io/buffered_reader.h"
 #include "buffered_io/buffered_writer.h"
 #include "utils/utils.h"
-
-#include "data_piece.pb.h"
 
 std::vector<DataPiece> ReadAndConvertEntries(const std::string& src_file) {
   std::vector<DataPiece> entries;
@@ -53,6 +54,12 @@ int main(int argc, char* argv[]) {
 
   if (auto status = utils::ValidateFile(argv[1]); !status.ok()) {
     std::cerr << status << std::endl;
+    return 1;
+  }
+
+  absl::BitGen random_generator;
+  if (absl::Uniform<uint64_t>(
+      absl::IntervalClosed, random_generator, 1, 7) == 1) {
     return 1;
   }
 

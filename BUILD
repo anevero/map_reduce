@@ -81,6 +81,7 @@ cc_binary(
     deps = [
         ":buffered_io",
         ":utils",
+        "@absl//absl/random",
         "@boost//:filesystem",
     ],
 )
@@ -91,6 +92,7 @@ cc_binary(
     deps = [
         ":buffered_io",
         ":utils",
+        "@absl//absl/random",
         "@boost//:filesystem",
     ],
 )

@@ -4,14 +4,12 @@
 #include <string>
 #include <vector>
 
-#include "absl/status/status.h"
-
 class ProcessManager {
  public:
   explicit ProcessManager(const std::vector<std::string>& temp_files);
   ~ProcessManager() = default;
 
-  absl::Status RunAndWait(const std::string& script_path);
+  void RunAndWait(const std::string& script_path);
 
  private:
   const std::vector<std::string>& temp_files_;

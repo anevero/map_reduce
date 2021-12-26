@@ -71,10 +71,10 @@ void TempFilesManager::CreateTemporaryFilesByKeys(
   }
 }
 
-absl::Status TempFilesManager::RunScriptOnTemporaryFiles(
+void TempFilesManager::RunScriptOnTemporaryFiles(
     const std::string& script_path) {
   ProcessManager process_manager(temp_files_);
-  return process_manager.RunAndWait(script_path);
+  process_manager.RunAndWait(script_path);
 }
 
 void TempFilesManager::SortLinesInTemporaryFiles() {
