@@ -1,17 +1,18 @@
-#include "buffered_reader.h"
-#include "buffered_writer.h"
-#include "constants.h"
-#include "process_manager.h"
-#include "temp_files_manager.h"
-#include "threadpool.h"
+#include "mapreduce_lib/temp_files_manager.h"
+#include "buffered_io/buffered_reader.h"
+#include "buffered_io/buffered_writer.h"
+#include "utils/constants.h"
 
 #include <algorithm>
-#include <boost/filesystem.hpp>
-#include <fstream>
 #include <iostream>
-#include <sstream>
 #include <utility>
 #include <vector>
+
+#include <boost/filesystem.hpp>
+
+#include "data_piece.pb.h"
+#include "mapreduce_lib/process_manager.h"
+#include "mapreduce_lib/threadpool.h"
 
 namespace bf = boost::filesystem;
 
@@ -25,9 +26,14 @@ void TempFilesManager::CreateTemporaryFilesByBlockSize(
   BufferedWriter writer;
 
   int lines_in_current_file = constants::kNumberOfLinesInBlock;
-  std::string current_line;
+  DataPiece entry;
 
-  while (reader.ReadLine(&current_line)) {
+  while (true) {
+    entry = reader.ReadDataPiece();
+    if (entry.key().empty()) {
+      break;
+    }
+
     if (lines_in_current_file >= constants::kNumberOfLinesInBlock) {
       writer.Close();
       CreateTemporaryFile();
@@ -35,7 +41,7 @@ void TempFilesManager::CreateTemporaryFilesByBlockSize(
       lines_in_current_file = 0;
     }
 
-    writer << current_line << constants::kLinesDelimiter;
+    writer << entry;
     ++lines_in_current_file;
   }
 }
@@ -46,48 +52,44 @@ void TempFilesManager::CreateTemporaryFilesByKeys(
   BufferedWriter writer;
 
   std::string previous_key = {};
-  std::string current_line;
+  DataPiece entry;
 
-  while (reader.ReadLine(&current_line)) {
-    std::istringstream stream(current_line);
+  while (true) {
+    entry = reader.ReadDataPiece();
+    if (entry.key().empty()) {
+      break;
+    }
 
-    std::string current_key;
-    std::getline(stream, current_key, constants::kKeyValueDelimiter);
-
-    if (current_key != previous_key) {
+    if (entry.key() != previous_key) {
       writer.Close();
       CreateTemporaryFile();
       writer.Open(temp_files_.back());
-      previous_key = current_key;
+      previous_key = entry.key();
     }
 
-    std::string current_value;
-    std::getline(stream, current_value, constants::kLinesDelimiter);
-
-    writer << current_key << constants::kKeyValueDelimiter
-           << current_value << constants::kLinesDelimiter;
+    writer << entry;
   }
 }
 
-int TempFilesManager::RunScriptOnTemporaryFiles(
+absl::Status TempFilesManager::RunScriptOnTemporaryFiles(
     const std::string& script_path) {
   ProcessManager process_manager(temp_files_);
   return process_manager.RunAndWait(script_path);
 }
 
 void TempFilesManager::SortLinesInTemporaryFiles() {
-  ThreadPool threadpool(constants::kNumberOfThreadsMultiplier *
+  ThreadPool thread_pool(constants::kNumberOfThreadsMultiplier *
       std::thread::hardware_concurrency());
-  for (const auto& file : temp_files_) {
-    threadpool.Schedule([this, &file] { SortTemporaryFile(file); });
+  for (const auto& file: temp_files_) {
+    thread_pool.Schedule([this, &file] { SortTemporaryFile(file); });
   }
-  threadpool.StartWorkers();
+  thread_pool.StartWorkers();
 }
 
 void TempFilesManager::MergeTemporaryFiles(
     const std::string& dst_file) const {
   std::ofstream out(dst_file, std::ios::binary);
-  for (const auto& file : temp_files_) {
+  for (const auto& file: temp_files_) {
     std::ifstream in(file, std::ios_base::binary);
     out << in.rdbuf();
   }
@@ -103,28 +105,33 @@ void TempFilesManager::MergeSortedTemporaryFiles(
   }
 
   struct HeapEntry {
-    std::string line;
+    DataPiece entry;
     int file_number;
 
     bool operator<(const HeapEntry& other) const {
-      return line > other.line;
+      if (entry.key() == other.entry.key()) {
+        return entry.subkey() > other.entry.subkey();
+      }
+      return entry.key() > other.entry.key();
     }
   };
 
-  std::vector<HeapEntry> heap(number_of_files);
+  std::vector<HeapEntry> heap;
+  heap.reserve(number_of_files);
   for (int i = 0; i < number_of_files; ++i) {
-    readers[i].ReadLine(&heap[i].line);
-    heap[i].file_number = i;
+    heap.push_back({readers[i].ReadDataPiece(), i});
   }
   std::make_heap(heap.begin(), heap.end());
 
   while (!heap.empty()) {
-    writer << heap.front().line << constants::kLinesDelimiter;
+    writer << heap.front().entry;
     std::pop_heap(heap.begin(), heap.end());
-    if (readers[heap.back().file_number].ReadLine(&heap.back().line)) {
-      std::push_heap(heap.begin(), heap.end());
-    } else {
+    auto new_entry = readers[heap.back().file_number].ReadDataPiece();
+    if (new_entry.key().empty()) {
       heap.pop_back();
+    } else {
+      heap.back().entry = new_entry;
+      std::push_heap(heap.begin(), heap.end());
     }
   }
 }
@@ -142,20 +149,30 @@ void TempFilesManager::CreateTemporaryFile() {
 }
 
 void TempFilesManager::SortTemporaryFile(const std::string& file) {
-  std::vector<std::string> lines;
-  lines.reserve(constants::kNumberOfLinesInBlock);
+  std::vector<DataPiece> entries;
+  entries.reserve(constants::kNumberOfLinesInBlock);
 
   BufferedReader reader(file);
-  std::string current_line;
-  while (reader.ReadLine(&current_line)) {
-    lines.push_back(std::move(current_line));
+  while (true) {
+    auto new_entry = reader.ReadDataPiece();
+    if (new_entry.key().empty()) {
+      break;
+    }
+    entries.push_back(std::move(new_entry));
   }
   reader.Close();
 
-  std::sort(lines.begin(), lines.end());
+  std::sort(entries.begin(),
+            entries.end(),
+            [](const DataPiece& a, const DataPiece& b) {
+              if (a.key() == b.key()) {
+                return a.subkey() < b.subkey();
+              }
+              return a.key() < b.key();
+            });
 
   BufferedWriter writer(file);
-  for (const auto& line : lines) {
-    writer << line << constants::kLinesDelimiter;
+  for (const auto& entry: entries) {
+    writer << entry;
   }
 }

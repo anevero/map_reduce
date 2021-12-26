@@ -3,7 +3,12 @@
 
 #include <deque>
 #include <fstream>
+#include <memory>
 #include <string>
+
+#include "google/protobuf/io/zero_copy_stream_impl.h"
+
+#include "data_piece.pb.h"
 
 class BufferedReader {
  public:
@@ -13,12 +18,14 @@ class BufferedReader {
   void Open(const std::string& src_file);
   void Close();
 
-  bool ReadLine(std::string* string);
+  DataPiece ReadDataPiece();
   void Buffer();
 
  private:
-  std::ifstream input_stream_;
-  std::deque<std::string> cache_;
+  std::ifstream file_stream_;
+  std::unique_ptr<google::protobuf::io::IstreamInputStream>
+      input_stream_ = nullptr;
+  std::deque<DataPiece> cache_;
 };
 
 #endif  // BUFFERED_READER_H_

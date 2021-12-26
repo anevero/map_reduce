@@ -1,15 +1,16 @@
-#include "constants.h"
-#include "process_manager.h"
+#include "mapreduce_lib/process_manager.h"
+#include "utils/constants.h"
+
+#include <thread>
 
 #include <boost/process.hpp>
-#include <thread>
 
 namespace bp = boost::process;
 
 ProcessManager::ProcessManager(const std::vector<std::string>& temp_files)
     : temp_files_(temp_files) {}
 
-int ProcessManager::RunAndWait(const std::string& script_path) {
+absl::Status ProcessManager::RunAndWait(const std::string& script_path) {
   int processes_number = temp_files_.size();
   int completed_processes = 0;
   int processes_per_cycle = constants::kNumberOfProcessesMultiplier *
@@ -34,18 +35,18 @@ int ProcessManager::RunAndWait(const std::string& script_path) {
     }
 
     int return_code = 0;
-    for (auto& process : current_processes) {
+    for (auto& process: current_processes) {
       process.wait();
       return_code += process.exit_code();
     }
 
     if (return_code != 0) {
-      return 1;
+      return absl::InternalError("Some processes exited with non-zero code");
     }
 
     current_processes.clear();
     completed_processes += processes_to_run;
   }
 
-  return 0;
+  return absl::OkStatus();
 }

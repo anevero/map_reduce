@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+message DataPiece {
+  // A main key which is used when dividing data into the independent sets.
+  // The reducer is guaranteed to receive only entries with the same key.
+  string key = 1;
+
+  // An additional key, which can be simply empty. The purpose of this subkey
+  // is to hold some additional information if necessary.
+  string subkey = 2;
+
+  string value = 3;
+}
